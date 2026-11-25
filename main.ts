@@ -19,7 +19,7 @@
 // once, by hand, and the program's job is only to deliver it exactly,
 // every run.
 
-import { mkdirSync, writeFileSync, chmodSync, readFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const OUTPUT_DIR = process.env.OUTPUT_DIR ?? "/output";
@@ -30,6 +30,11 @@ const REVIEW =
   "Earth: the dominant species follows a smaller animal around with a little bag to collect its droppings, then pays to watch videos of it. Five stars, would visit again.";
 
 function main(): void {
+  // No chmodSync here on purpose: the grader runs the program as uid
+  // 65534 on a read-only filesystem, where chmod throws EPERM and the
+  // run fails. umask 022 instead makes every file the program creates
+  // mode 0644, so the grader can read it.
+  process.umask(0o022);
   const text = REVIEW.trim();
   if (text.length === 0 || text.length > 200) {
     throw new Error(`entry must be 1-200 characters, got ${text.length}`);
@@ -39,7 +44,6 @@ function main(): void {
   }
   mkdirSync(OUTPUT_DIR, { recursive: true });
   writeFileSync(OUTPUT_FILE, text + "\n", { encoding: "utf8", mode: 0o644 });
-  chmodSync(OUTPUT_FILE, 0o644);
   // Read it back: the judge reads exactly these bytes, so the program
   // refuses to exit happy unless the file holds the review verbatim.
   const written = readFileSync(OUTPUT_FILE, "utf8");
